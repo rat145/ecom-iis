@@ -1,0 +1,127 @@
+/**=====================
+     Item scss
+==========================**/
+@use '../utils/variables';
+@use '../utils/mixin/common';
+.button-item {
+  @include common.flex_common;
+  @include common.center(vertical);
+  position: fixed;
+  right: 0;
+  border-radius: 7px 0 0 7px;
+  background-color: var(--theme-color);
+  z-index: 1;
+
+  .item-btn {
+    @include common.pseudowh($width: calc(41px + (50 - 41) * ((100vw - 320px) / (1920 - 320))), $height: calc(41px + (50 - 41) * ((100vw - 320px) / (1920 - 320))));
+    padding: 0;
+
+    &:hover {
+      background-color: transparent;
+    }
+
+    &:first-child {
+      &:active {
+        color: #ffffff;
+        background-color: transparent;
+        border-color: transparent;
+      }
+    }
+  }
+
+  .item-btn {
+    svg {
+      font-size: calc(18px + (22 - 18) * ((100vw - 320px) / (1920 - 320)));
+    }
+  }
+}
+
+.item-section {
+  @include common.center(vertical);
+  position: fixed;
+  right: -200px;
+  background-color: var(--theme-color);
+  color: var(--white);
+  border-radius: 7px 0 0 7px;
+  padding: 15px;
+  transition: all 0.3s ease-in-out;
+  z-index: 8;
+
+  &.active {
+    right: 0;
+  }
+
+  .close-button {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 0;
+    color: var(--white);
+    border: none;
+    background-color: transparent;
+
+    &:first-child {
+      &:active {
+        color: var(--white);
+        background-color: transparent;
+        border-color: transparent;
+      }
+    }
+  }
+
+  h6 {
+    @include common.flex_common;
+    flex-wrap: nowrap;
+    gap: 5px;
+    margin-top: 15px;
+    font-weight: bold;
+
+    svg {
+      font-size: 20px;
+    }
+
+    span {
+      margin-top: 3px;
+    }
+  }
+
+  .items-image {
+    @include common.flex_common;
+    margin: 10px 0;
+
+    li {
+      @include common.flex_common;
+      @include common.pseudowh($width: 30px, $height: 30px);
+      background-color: var(--white);
+      border-radius: 50%;
+      border: 1px solid var(--theme-color);
+      color: var(--theme-color);
+      font-weight: 600;
+      font-size: 13px;
+
+      +li {
+        margin-left: -10px;
+
+        body[dir="rtl"] & {
+          margin-left: unset;
+          margin-right: -10px;
+        }
+      }
+
+      img {
+        @include common.pseudowh($width: 15px, $height: 15px);
+        object-fit: contain;
+      }
+    }
+  }
+
+  .item-button {
+    background-color: #ffffff !important;
+    color: var(--theme-color) !important;
+
+    &:hover {
+      background-color: #ffffff !important;
+      color: var(--theme-color) !important;
+    }
+  }
+}
