@@ -1,0 +1,82 @@
+@use "sass:color";
+
+/* components */
+@use 'components/alert';
+@use 'components/accordion';
+@use 'components/breadscrumb';
+@use 'components/button';
+@use 'components/cookie_bar';
+@use 'components/counter';
+@use 'components/form';
+@use 'components/label';
+@use 'components/card';
+@use 'components/loader';
+@use 'components/modal';
+@use 'components/nav-tabs';
+@use 'components/pagination';
+@use 'components/ratio';
+@use 'components/slider';
+@use 'components/tab';
+@use 'components/tap-to-top';
+@use 'components/theme-setting';
+@use 'components/timer';
+@use 'components/title';
+@use 'components/tooltip';
+@use 'components/country-flag';
+@use 'components/confetti';
+
+// /* Base */
+@use 'base/reset';
+@use 'base/typography';
+
+// /* Layout */
+@use 'layout/banner';
+@use 'layout/blog';
+@use 'layout/category';
+@use 'layout/footer';
+@use 'layout/header';
+@use 'layout/home';
+@use 'layout/item';
+@use 'layout/nav';
+@use 'layout/newsletter';
+@use 'layout/offer';
+@use 'layout/product';
+@use 'layout/review';
+@use 'layout/service';
+
+// /* Pages *//
+@use 'pages/coming-soon';
+@use 'pages/inner_pages';
+@use 'pages/shop_page';
+@use 'pages/user-dashboard';
+@use 'pages/product_page';
+@use 'pages/checkout';
+@use 'pages/pos';
+
+// /* Themes */
+@use 'themes/rtl';
+
+/* utils */
+// @use 'utils/mixin/animation';
+// @use 'utils/mixin/common';
+// @use 'utils/mixin/breakpoints';
+
+.theme-color-1 {
+  --theme-color: #d99f46;
+}
+
+.theme-color-2 {
+  --theme-color: #0baf9a;
+}
+
+.theme-color-3 {
+  --theme-color: #239698;
+}
+
+.theme-color-4 {
+  --theme-color: #6262a6;
+}
+
+.theme-color-5 {
+  --theme-color: #417394;
+}

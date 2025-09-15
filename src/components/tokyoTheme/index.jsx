@@ -1,0 +1,81 @@
+'use client';
+import ProductIdsContext from '@/helper/productIdsContext';
+import ThemeOptionContext from '@/helper/themeOptionsContext';
+import StickyCart from '@/layout/stickyCart';
+import request from '@/utils/axiosUtils';
+import { HomePageAPI } from '@/utils/axiosUtils/API';
+import { useQuery } from '@tanstack/react-query';
+import { useContext, useEffect } from 'react';
+import FeatureBanner from '../parisTheme/HomeBanner';
+import NewsLetter from '../parisTheme/NewsLetter';
+import CategoryMenu from './CategoryMenu';
+import HomeBanner from './HomeBanner';
+import OfferBanner from './OfferBanner';
+import ProductCard from './ProductCard';
+import TopSelling from './topSelling';
+import Loader from '@/layout/loader';
+
+const TokyoTheme = () => {
+  const { themeOption } = useContext(ThemeOptionContext);
+  const { setGetProductIds, isLoading: productLoader } = useContext(ProductIdsContext);
+  const { data, isLoading, refetch, fetchStatus } = useQuery({queryKey: ['tokyo'], queryFn: () => request({ url: `${HomePageAPI}/tokyo` }),
+    enabled: false,
+    refetchOnWindowFocus: false,
+    select: (res) => res?.data,
+  });
+  useEffect(() => {
+    const headerTops = document.getElementsByClassName('header-top');
+
+    document.documentElement.style.setProperty('--theme-color', '#d99f46');
+    let timer = setTimeout(() => {
+      for (const headerTop of headerTops) {
+        headerTop.classList.add('bg-dark');
+      }
+    }, 0);
+
+    refetch();
+
+    return () => {
+      document.documentElement.style.removeProperty('--theme-color');
+      for (const headerTop of headerTops) {
+        headerTop.classList.remove('bg-dark');
+      }
+      clearTimeout(timer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isLoading && fetchStatus == 'fetching') {
+      document.body.classList.add('skeleton-body');
+    } else {
+      document.body.classList.remove('skeleton-body');
+    }
+
+    if (data?.content?.products_ids?.length > 0) {
+      setGetProductIds({ ids: Array.from(new Set(data?.content?.products_ids))?.join(',') });
+    }
+  }, [fetchStatus == 'fetching', !isLoading]);
+  if (isLoading) return <Loader />;
+  return (
+    <>
+      <HomeBanner dataAPI={data?.content?.home_banner} />
+
+      {data?.content?.categories_icon_list?.status && <CategoryMenu dataAPI={data?.content?.categories_icon_list} />}
+
+      {data?.content?.coupons?.status && <OfferBanner dataAPI={data?.content?.coupons} height={138} width={1585} classes={{ fluidClass: 'sale-banner' }} />}
+
+      {data?.content?.featured_banners?.status && data?.content?.featured_banners?.banners?.length > 0 && <FeatureBanner bannersData={data?.content?.featured_banners?.banners} />}
+
+      <ProductCard dataAPI={data?.content} />
+
+      {data?.content?.full_width_banner?.status && <OfferBanner dataAPI={data?.content?.full_width_banner} height={343} width={1524} />}
+
+      {data?.content?.slider_products?.status && <TopSelling dataAPI={data?.content?.slider_products} classes={{ colClass: { sm: 6, xl: 4, xxl: 3 } }} />}
+
+      {data?.content?.news_letter?.status && <NewsLetter dataAPI={data?.content?.news_letter} />}
+      {themeOption?.general?.sticky_cart_enable && themeOption?.general?.cart_style !== 'cart_sidebar' && <StickyCart />}
+    </>
+  );
+};
+
+export default TokyoTheme;
