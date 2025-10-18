@@ -1,11 +1,12 @@
-import AccountDashboard from "@/components/account/dashboard"
+import AccountDashboard from "@/components/account/dashboard";
+import { withCustomerAuth } from "@/utils/hoc/withAuth";
 
 const Dashboard = () => {
-    return (
-        <>
-            <AccountDashboard />
-        </>
-    )
-}
+  return (
+    <>
+      <AccountDashboard />
+    </>
+  );
+};
 
-export default Dashboard
+export default withCustomerAuth(Dashboard);
