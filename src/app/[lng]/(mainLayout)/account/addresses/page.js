@@ -1,9 +1,7 @@
-import AccountAddresses from "@/components/account/addresses"
+import AccountAddresses from "@/components/account/addresses";
 
 const Addresses = () => {
-    return (
-        <AccountAddresses />
-    )
-}
+  return <AccountAddresses />;
+};
 
-export default Addresses
+export default Addresses;

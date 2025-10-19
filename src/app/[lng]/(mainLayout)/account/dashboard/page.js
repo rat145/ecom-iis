@@ -1,3 +1,4 @@
+"use client";
 import AccountDashboard from "@/components/account/dashboard";
 import { withCustomerAuth } from "@/utils/hoc/withAuth";
 
