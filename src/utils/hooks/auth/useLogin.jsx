@@ -1,48 +1,84 @@
-import { useMutation } from '@tanstack/react-query';
-import request from '../../axiosUtils';
-import { emailSchema, passwordSchema, YupObject } from '../../validation/ValidationSchemas';
-import { LoginAPI } from '../../axiosUtils/API';
-import { useRouter } from 'next/navigation';
-import { useContext } from 'react';
-import I18NextContext from '@/helper/i18NextContext';
-import Cookies from 'js-cookie';
-import AccountContext from '@/helper/accountContext';
-import CompareContext from '@/helper/compareContext';
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "react-toastify";
+import {
+  emailSchema,
+  passwordSchema,
+  YupObject,
+} from "../../validation/ValidationSchemas";
+import { loginUser } from "@/services/authService";
 
 export const LogInSchema = YupObject({
   email: emailSchema,
   password: passwordSchema,
 });
 
-const LoginHandle = (responseData, router, i18Lang, refetch, compareRefetch) => {
-  if (responseData.status === 200 || responseData.status === 201) {
-    Cookies.set('uat', responseData.data?.access_token, { path: '/', expires: new Date(Date.now() + 24 * 60 * 6000) });
-    const ISSERVER = typeof window === 'undefined';
-    if (typeof window !== 'undefined') {
-      Cookies.set('account', JSON.stringify(responseData.data));
-      localStorage.setItem('account', JSON.stringify(responseData.data));
-    }
-    refetch();
-    compareRefetch();
-    router.push(`/${i18Lang}/account/dashboard`);
-  }
-};
-
-const useHandleLogin = () => {
-  const { i18Lang } = useContext(I18NextContext);
-  const { refetch } = useContext(AccountContext);
-  const { refetch: compareRefetch } = useContext(CompareContext);
+/**
+ * Custom hook for handling user login with Firebase
+ * @returns {Object} Login mutation function and loading state
+ */
+const useHandleLogin = (i18Lang = "en") => {
   const router = useRouter();
-  return useMutation({
-    mutationFn: (data) =>
-      request({
-        url: LoginAPI,
-        method: 'post',
-        data,
-      }),
-      onSuccess: (responseData) => LoginHandle(responseData, router, i18Lang, refetch, compareRefetch),
-    },
-  );
+  const [isLoading, setIsLoading] = useState(false);
+
+  const mutate = async (values) => {
+    setIsLoading(true);
+
+    try {
+      // Login with Firebase
+      const result = await loginUser(values.email, values.password);
+
+      if (result.success) {
+        toast.success("Login successful!");
+
+        // Redirect based on user role
+        if (result.user.role === "admin") {
+          // Admins should use the admin panel
+          toast.info("Admin users should use the admin panel");
+          router.push(`/${i18Lang}/account/dashboard`);
+        } else if (result.user.role === "vendor") {
+          router.push(`/${i18Lang}/account/dashboard`);
+        } else {
+          // Regular customers
+          router.push(`/${i18Lang}/account/dashboard`);
+        }
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+
+      // Handle specific Firebase errors
+      let errorMessage = "Login failed. Please try again.";
+
+      if (
+        error.code === "auth/invalid-credential" ||
+        error.code === "auth/wrong-password"
+      ) {
+        errorMessage = "Invalid email or password.";
+      } else if (error.code === "auth/user-not-found") {
+        errorMessage = "No account found with this email.";
+      } else if (error.code === "auth/user-disabled") {
+        errorMessage = "This account has been disabled.";
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage =
+          "Too many failed login attempts. Please try again later.";
+      } else if (error.code === "auth/network-request-failed") {
+        errorMessage = "Network error. Please check your internet connection.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return {
+    mutate,
+    isLoading,
+  };
 };
 
 export default useHandleLogin;

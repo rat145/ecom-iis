@@ -1,45 +1,83 @@
-import React, { useContext, useState } from "react";
+"use client";
+
+import React, { useState } from "react";
 import Link from "next/link";
-import I18NextContext from "@/helper/i18NextContext";
-import { useTranslation } from "@/app/i18n/client";
 import { useRouter } from "next/navigation";
 import { RiLogoutBoxRLine, RiUserLine } from "react-icons/ri";
-import { LogoutAPI } from "@/utils/axiosUtils/API";
-import useCreate from "@/utils/hooks/useCreate";
+import { toast } from "react-toastify";
+import { useAuth } from "@/contexts/AuthContext";
+import { logoutUser } from "@/services/authService";
 import ConfirmationModal from "@/components/common/ConfirmationModal";
-import AccountContext from "@/helper/accountContext";
-import Avatar from "@/components/common/Avatar";
+import { useTranslation } from "@/app/i18n/client";
 
-const HeaderProfile = () => {
-  const { i18Lang } = useContext(I18NextContext);
-  const { accountData } = useContext(AccountContext);
+const HeaderProfile = ({ i18Lang = "en" }) => {
+  const { user } = useAuth();
   const router = useRouter();
   const [modal, setModal] = useState(false);
-  const [loading, setLoading] = useState(false); 
+  const [loading, setLoading] = useState(false);
   const { t } = useTranslation(i18Lang, "common");
-  const { mutate, isLoading } = useCreate(LogoutAPI,false,false,"Logout Successfully", () => { router.push(`/${i18Lang}/auth/login`); setModal(false); setLoading(false); });
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     setLoading(true);
-    mutate({});
+
+    try {
+      await logoutUser();
+      toast.success("Logged out successfully");
+      setModal(false);
+      router.push(`/${i18Lang}/auth/login`);
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast.error("Failed to logout. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Get user's first letter for avatar fallback
+  const getUserInitial = () => {
+    if (user?.name) {
+      return user.name.charAt(0).toUpperCase();
+    }
+    if (user?.email) {
+      return user.email.charAt(0).toUpperCase();
+    }
+    return "U";
+  };
+
   return (
     <li className="right-side onhover-dropdown">
       <div className="delivery-login-box">
         <div className="delivery-icon">
-          {accountData?.profile_image?.original_url ? (
-            <Avatar
-              data={accountData?.profile_image}
-              customClass="user-box me-2"
-              customImageClass="img-fluid"
+          {user?.profile_image_url ? (
+            <img
+              src={user.profile_image_url}
+              alt={user.name || "User"}
+              className="img-fluid rounded-circle"
+              style={{ width: "40px", height: "40px", objectFit: "cover" }}
             />
           ) : (
-            <h3>{accountData?.name?.charAt(0)?.toString()?.toUpperCase()}</h3>
+            <div
+              className="user-avatar-placeholder"
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "50%",
+                backgroundColor: "#0da487",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "white",
+                fontWeight: "bold",
+                fontSize: "18px",
+              }}
+            >
+              {getUserInitial()}
+            </div>
           )}
         </div>
         <div className="delivery-detail">
           <h6>
-            {t("Hi")}, { accountData?.name ?? t("User")}
+            {t("Hi")}, {user?.name || t("User")}
           </h6>
           <h5>{t("MyAccount")}</h5>
         </div>
@@ -53,18 +91,19 @@ const HeaderProfile = () => {
             </Link>
           </li>
           <li className="product-box-contain" onClick={() => setModal(true)}>
-            <a>
+            <a style={{ cursor: "pointer" }}>
               <RiLogoutBoxRLine className="me-2" /> {t("Logout")}
             </a>
           </li>
-          <ConfirmationModal
-            modal={modal}
-            setModal={setModal}
-            confirmFunction={handleLogout}
-            isLoading={loading}
-          />
         </ul>
       </div>
+
+      <ConfirmationModal
+        modal={modal}
+        setModal={setModal}
+        confirmFunction={handleLogout}
+        isLoading={loading}
+      />
     </li>
   );
 };
