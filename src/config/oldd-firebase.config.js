@@ -9,7 +9,7 @@ import { getFirebaseConfig } from "@/utils/validateEnv";
 
 // Get and validate Firebase configuration
 const firebaseConfig = getFirebaseConfig();
-
+//
 // Initialize Firebase (avoid multiple initializations)
 let app;
 if (!getApps().length) {
