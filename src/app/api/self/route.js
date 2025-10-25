@@ -1,27 +1,33 @@
-// Get Current User API Route
+// Get Current User API Route (FIXED VERSION)
 // src/app/api/self/route.js
 
-import { NextResponse } from 'next/server';
-import { doc, getDoc } from 'firebase/firestore';
-import { auth, db } from '@/config/firebase.config';
+import { NextResponse } from "next/server";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/config/firebase.config";
+import { verifyAuth, getUserIdFromToken } from "@/lib/auth";
 
 export async function GET(request) {
   try {
-    const user = auth.currentUser;
+    // Verify authentication using server-side method
+    const authResult = await verifyAuth(request);
 
-    if (!user) {
-      return NextResponse.json(
-        { error: 'Not authenticated' },
-        { status: 401 }
-      );
+    if (!authResult || !authResult.token) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    // Extract user ID from token
+    const userId = await getUserIdFromToken(authResult.token);
+
+    if (!userId) {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     // Get user data from Firestore
-    const userDoc = await getDoc(doc(db, 'users', user.uid));
-    
+    const userDoc = await getDoc(doc(db, "users", userId));
+
     if (!userDoc.exists()) {
       return NextResponse.json(
-        { error: 'User data not found' },
+        { error: "User data not found" },
         { status: 404 }
       );
     }
@@ -31,20 +37,16 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       data: {
-        uid: user.uid,
-        email: user.email,
-        emailVerified: user.emailVerified,
-        ...userData
-      }
+        uid: userId,
+        ...userData,
+      },
     });
-
   } catch (error) {
-    console.error('Get current user error:', error);
-    
+    console.error("Get current user error:", error);
+
     return NextResponse.json(
-      { error: 'Failed to get user data' },
+      { error: "Failed to get user data" },
       { status: 500 }
     );
   }
 }
-
