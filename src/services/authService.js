@@ -13,6 +13,7 @@ import {
 } from "firebase/auth";
 import { doc, setDoc, getDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "../config/firebase.config";
+import Cookies from "js-cookie";
 
 /**
  * Register a new user
@@ -22,82 +23,86 @@ import { auth, db } from "../config/firebase.config";
  * @param {string} phone - User phone number
  * @returns {Promise<Object>} User data
  */
-// export const registerUser = async (email, password, name, phone = '') => {
-//   try {
-//     // Create user in Firebase Auth
-//     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-//     const user = userCredential.user;
-
-//     // Update user profile with name
-//     await updateProfile(user, {
-//       displayName: name
-//     });
-
-//     // Send email verification
-//     await sendEmailVerification(user);
-
-//     // Create user document in Firestore
-//     await setDoc(doc(db, 'users', user.uid), {
-//       uid: user.uid,
-//       email: email,
-//       name: name,
-//       phone: phone,
-//       role: 'customer',
-//       profile_image_url: '',
-//       status: 1,
-//       points: 0,
-//       wallet_balance: 0,
-//       created_at: serverTimestamp(),
-//       updated_at: serverTimestamp()
-//     });
-
-//     return {
-//       success: true,
-//       user: {
-//         uid: user.uid,
-//         email: user.email,
-//         name: name,
-//         role: 'customer'
-//       }
-//     };
-//   } catch (error) {
-//     console.error('Registration error:', error);
-//     throw error;
-//   }
-// };
-
 export const registerUser = async (email, password, name, phone = "") => {
   try {
-    // Call server-side API route
-    const response = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password, name, phone }),
-      credentials: "include",
+    // Create user in Firebase Auth
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+    const user = userCredential.user;
+
+    // Update user profile with name
+    await updateProfile(user, {
+      displayName: name,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Registration failed");
-    }
+    // Send email verification
+    await sendEmailVerification(user);
 
-    const data = await response.json();
+    // Create user document in Firestore
+    await setDoc(doc(db, "users", user.uid), {
+      uid: user.uid,
+      email: email,
+      name: name,
+      phone: phone,
+      role: "customer",
+      profile_image_url: "",
+      status: 1,
+      points: 0,
+      wallet_balance: 0,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    });
 
-    if (data.success) {
-      return {
-        success: true,
-        user: data.data.user,
-      };
-    } else {
-      throw new Error("Registration failed");
-    }
+    return {
+      success: true,
+      user: {
+        uid: user.uid,
+        email: user.email,
+        name: name,
+        role: "customer",
+      },
+    };
   } catch (error) {
     console.error("Registration error:", error);
     throw error;
   }
 };
+
+// export const registerUser = async (email, password, name, phone = "") => {
+//   try {
+//     // Call server-side API route
+//     const response = await fetch("/api/auth/register", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify({ email, password, name, phone }),
+//       credentials: "include",
+//     });
+
+//     if (!response.ok) {
+//       const errorData = await response.json();
+//       throw new Error(errorData.error || "Registration failed");
+//     }
+
+//     const data = await response.json();
+
+//     if (data.success) {
+//       return {
+//         success: true,
+//         user: data.data.user,
+//       };
+//     } else {
+//       throw new Error("Registration failed");
+//     }
+//   } catch (error) {
+//     console.error("Registration error:", error);
+//     throw error;
+//   }
+// };
 
 /**
  * Login user with email and password
@@ -107,14 +112,18 @@ export const registerUser = async (email, password, name, phone = "") => {
  */
 // export const loginUser = async (email, password) => {
 //   try {
-//     const userCredential = await signInWithEmailAndPassword(auth, email, password);
+//     const userCredential = await signInWithEmailAndPassword(
+//       auth,
+//       email,
+//       password
+//     );
 //     const user = userCredential.user;
 
 //     // Get user data from Firestore to check role
-//     const userDoc = await getDoc(doc(db, 'users', user.uid));
+//     const userDoc = await getDoc(doc(db, "users", user.uid));
 
 //     if (!userDoc.exists()) {
-//       throw new Error('User data not found');
+//       throw new Error("User data not found");
 //     }
 
 //     const userData = userDoc.data();
@@ -129,42 +138,84 @@ export const registerUser = async (email, password, name, phone = "") => {
 //         email: user.email,
 //         name: userData.name,
 //         role: userData.role,
-//         token: token
-//       }
+//         token: token,
+//       },
 //     };
 //   } catch (error) {
-//     console.error('Login error:', error);
+//     console.error("Login error:", error);
+//     throw error;
+//   }
+// };
+
+// export const loginUser = async (email, password) => {
+//   try {
+//     // Call server-side API route
+//     const response = await fetch("/api/auth/login", {
+//       method: "POST",
+//       headers: {
+//         "Content-Type": "application/json",
+//       },
+//       body: JSON.stringify({ email, password }),
+//       credentials: "include", // Important: include cookies
+//     });
+
+//     if (!response.ok) {
+//       const errorData = await response.json();
+//       throw new Error(errorData.error || "Login failed");
+//     }
+
+//     const data = await response.json();
+
+//     if (data.success) {
+//       return {
+//         success: true,
+//         user: data.data.user,
+//       };
+//     } else {
+//       throw new Error("Login failed");
+//     }
+//   } catch (error) {
+//     console.error("Login error:", error);
 //     throw error;
 //   }
 // };
 
 export const loginUser = async (email, password) => {
   try {
-    // Call server-side API route
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-      credentials: "include", // Important: include cookies
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+    const user = userCredential.user;
+
+    const userDoc = await getDoc(doc(db, "users", user.uid));
+
+    if (!userDoc.exists()) {
+      throw new Error("User data not found");
+    }
+
+    const userData = userDoc.data();
+    const token = await user.getIdToken();
+
+    // Set cookie using js-cookie
+    Cookies.set("uat", token, {
+      expires: 7, // 7 days
+      path: "/",
+      sameSite: "Lax",
+      secure: true,
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Login failed");
-    }
-
-    const data = await response.json();
-
-    if (data.success) {
-      return {
-        success: true,
-        user: data.data.user,
-      };
-    } else {
-      throw new Error("Login failed");
-    }
+    return {
+      success: true,
+      user: {
+        uid: user.uid,
+        email: user.email,
+        name: userData.name,
+        role: userData.role,
+        token: token,
+      },
+    };
   } catch (error) {
     console.error("Login error:", error);
     throw error;
