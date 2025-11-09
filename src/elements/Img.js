@@ -1,9 +1,10 @@
-import Image from "next/image";
-import React from "react";
-
 const Img = (props) => {
-  const newProps = { ...props, src: process.env.API_PROD_URL + "/" + props["src"] };
-  return <Image {...newProps} />;
+  // Check if src is a full URL or Firebase Storage URL
+  const isFullUrl =
+    props.src?.startsWith("http") || props.src?.startsWith("https");
+  const newProps = {
+    ...props,
+    src: isFullUrl ? props.src : props.src,
+  };
+  return <img {...newProps} alt={props.alt || ""} />;
 };
-
-export default Img;

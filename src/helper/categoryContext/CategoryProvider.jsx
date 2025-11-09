@@ -1,28 +1,110 @@
-import React, { useEffect, useState } from 'react';
-import { CategoryAPI } from '@/utils/axiosUtils/API';
-import { useQuery } from '@tanstack/react-query';
-import request from '@/utils/axiosUtils';
-import CategoryContext from '.';
+"use client";
+
+import React, { useEffect, useState } from "react";
+import CategoryContext from ".";
+import {
+  getCategories,
+  getCategoryById,
+  getCategoryBySlug,
+} from "@/services/categoryService";
 
 const CategoryProvider = (props) => {
-  const [categoryAPIData, setCategoryAPIData] = useState({ data: [], refetchCategory: '', params: {}, categoryIsLoading: false });
-  const { data: categoryData, isLoading: categoryIsLoading } = useQuery({queryKey: [CategoryAPI], queryFn:() => request({ url: CategoryAPI, params: { ...categoryAPIData.params, status: 1 } }),
-    enabled: true,
-    refetchOnWindowFocus: false,
-    select: (data) => data.data.data,
+  const [categories, setCategories] = useState([]);
+  const [categoryIsLoading, setCategoryIsLoading] = useState(false);
+  const [categoryAPIData, setCategoryAPIData] = useState({
+    data: [],
+    categoryIsLoading: false,
   });
-  const filterCategory = (value) => {
-    return categoryData?.filter((elem) => elem.type === value) || [];
+
+  // Load all categories on mount
+  useEffect(() => {
+    loadCategories();
+  }, []);
+
+  // Load categories from Firebase
+  const loadCategories = async (filters = {}) => {
+    try {
+      setCategoryIsLoading(true);
+      const categoriesData = await getCategories({ status: 1, ...filters });
+      setCategories(categoriesData);
+      setCategoryAPIData({
+        data: categoriesData,
+        categoryIsLoading: false,
+      });
+    } catch (error) {
+      console.error("Error loading categories:", error);
+      setCategories([]);
+      setCategoryAPIData({
+        data: [],
+        categoryIsLoading: false,
+      });
+    } finally {
+      setCategoryIsLoading(false);
+    }
   };
 
-  // Setting Data on Category variables
-  useEffect(() => {
-    if (categoryData) {
-      setCategoryAPIData((prev) => ({ ...prev, data: categoryData, categoryIsLoading: categoryIsLoading }));
+  // Filter categories by type (product, blog, etc.)
+  const filterCategory = (type) => {
+    if (!categories || categories.length === 0) {
+      return [];
     }
-  }, [categoryData]);
+    return categories.filter((category) => category.type === type);
+  };
 
-  return <CategoryContext.Provider value={{ ...props, categoryAPIData, setCategoryAPIData, filterCategory: filterCategory, categoryIsLoading }}>{props.children}</CategoryContext.Provider>;
+  // Get category tree structure
+  const getCategoryTree = async () => {
+    try {
+      return await getCategories({ tree: true, status: 1 });
+    } catch (error) {
+      console.error("Error getting category tree:", error);
+      return [];
+    }
+  };
+
+  // Get single category by ID
+  const getCategory = async (categoryId) => {
+    try {
+      return await getCategoryById(categoryId);
+    } catch (error) {
+      console.error("Error getting category:", error);
+      return null;
+    }
+  };
+
+  // Get category by slug
+  const getCategorySlug = async (slug) => {
+    try {
+      return await getCategoryBySlug(slug);
+    } catch (error) {
+      console.error("Error getting category by slug:", error);
+      return null;
+    }
+  };
+
+  // Refetch categories (for compatibility with existing code)
+  const refetchCategory = () => {
+    loadCategories();
+  };
+
+  return (
+    <CategoryContext.Provider
+      value={{
+        ...props,
+        categories,
+        categoryAPIData,
+        setCategoryAPIData,
+        categoryIsLoading,
+        filterCategory,
+        loadCategories,
+        getCategoryTree,
+        getCategory,
+        getCategorySlug,
+        refetchCategory,
+      }}
+    >
+      {props.children}
+    </CategoryContext.Provider>
+  );
 };
 
 export default CategoryProvider;

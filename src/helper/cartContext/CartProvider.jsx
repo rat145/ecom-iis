@@ -1,188 +1,237 @@
-import React, { useContext, useEffect, useMemo, useState } from 'react';
-import Cookies from 'js-cookie';
-import CartContext from '.';
-import { ToastNotification } from '@/utils/customFunctions/ToastNotification';
-import { AddToCartAPI } from '@/utils/axiosUtils/API';
-import request from '@/utils/axiosUtils';
-import { useQuery } from '@tanstack/react-query';
-import ThemeOptionContext from '../themeOptionsContext';
+"use client";
+
+import React, { useContext, useEffect, useMemo, useState } from "react";
+import CartContext from ".";
+import { ToastNotification } from "@/utils/customFunctions/ToastNotification";
+import ThemeOptionContext from "../themeOptionsContext";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  getCart,
+  addToCart,
+  updateCartItem,
+  removeFromCart,
+  clearCart,
+} from "@/services/cartService";
 
 const CartProvider = (props) => {
-  const isCookie = Cookies.get('uat');
+  const { user, isAuthenticated } = useAuth();
   const [cartProducts, setCartProducts] = useState([]);
-  const [variationModal, setVariationModal] = useState('');
+  const [variationModal, setVariationModal] = useState("");
   const [cartTotal, setCartTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
   const { setCartCanvas } = useContext(ThemeOptionContext);
-  const {
-    data: CartAPIData,
-    isLoading: getCartLoading,
-    refetch,
-  } = useQuery({queryKey:[AddToCartAPI],queryFn: () => request({ url: AddToCartAPI }), enabled: false, refetchOnWindowFocus: false, select: (res) => res?.data });  //enabled: false, // <-- disables automatic fetching
 
-  // Refetching Cart API
+  // Load cart on mount and when user changes
   useEffect(() => {
-    if (isCookie) {
-      refetch();
-    }
-  }, [isCookie]);
+    loadCart();
+  }, [user, isAuthenticated]);
 
-  // Setting CartAPI data to state and LocalStorage
-  useEffect(() => {
-    if (isCookie) {
-      if (CartAPIData) {
-        setCartProducts(CartAPIData?.items);
-        setCartTotal(CartAPIData?.total);
+  // Load cart from Firebase or localStorage
+  const loadCart = async () => {
+    if (isAuthenticated && user) {
+      try {
+        setLoading(true);
+        const cartData = await getCart(user.uid);
+        setCartProducts(cartData.items || []);
+        calculateTotal(cartData.items || []);
+      } catch (error) {
+        console.error("Error loading cart:", error);
+        ToastNotification("error", "Failed to load cart");
+      } finally {
+        setLoading(false);
       }
     } else {
-      const isCartAvailable = JSON.parse(localStorage.getItem('cart'));
-      if (isCartAvailable?.items?.length > 0) {
-        setCartProducts(isCartAvailable?.items);
-        setCartTotal(isCartAvailable?.total);
-      }
+      // Load from localStorage for guest users
+      const localCart = JSON.parse(
+        localStorage.getItem("cart") || '{"items":[]}'
+      );
+      setCartProducts(localCart.items || []);
+      calculateTotal(localCart.items || []);
     }
-  }, [getCartLoading]);
-
-  // Adding data in localstorage when not Login
-  useEffect(() => {
-    storeInLocalStorage();
-  }, [cartProducts]);
-
-  // Getting total
-  const total = useMemo(() => {
-    return cartProducts?.reduce((prev, curr) => {
-      return prev + Number(curr.sub_total);
-    }, 0);
-  }, [getCartLoading, cartProducts]);
-
-  // Total Function for child components
-  const getTotal = (value) => {
-    return value?.reduce((prev, curr) => {
-      return prev + Number(curr.sub_total);
-    }, 0);
   };
 
-  // Remove and Delete cart data from API and State
-  const removeCart = (id, cartId) => {
-    const updatedCart = cartProducts?.filter((item) => item.product_id !== id);
-    setCartProducts(updatedCart);
-  };
-
-  // Common Handler for Increment and Decrement
-  const handleIncDec = (qty, productObj, isProductQty, setIsProductQty, isOpenFun, cloneVariation) => {
-    const cartUid = null;
-    const updatedQty = isProductQty ? isProductQty : 0 + qty;
-    const cart = [...cartProducts];
-    const index = cart.findIndex((item) => item.product_id === productObj?.id);
-    let tempProductId = productObj?.id;
-    let tempVariantProductId = cloneVariation?.selectedVariation?.product_id;
-
-    // Checking conditions for Replace Cart
-    if (cart[index]?.variation && cloneVariation?.variation_id && tempProductId == tempVariantProductId && cloneVariation?.variation_id !== cart[index]?.variation_id) {
-      return replaceCart(updatedQty, productObj, cloneVariation);
-    }
-
-    // Add data when not present in Cart variable
-    if (index === -1) {
-      const params = {
-        id: null,
-        product: productObj,
-        product_id: productObj?.id,
-        variation: cloneVariation?.selectedVariation ? cloneVariation?.selectedVariation : null,
-        variation_id: cloneVariation?.selectedVariation?.id ? cloneVariation?.selectedVariation?.id : null,
-        quantity: cloneVariation?.selectedVariation?.productQty ? cloneVariation?.selectedVariation?.productQty : updatedQty,
-        sub_total: cloneVariation?.selectedVariation?.sale_price ? updatedQty * cloneVariation?.selectedVariation?.sale_price : updatedQty * productObj?.sale_price,
-      };
-      isCookie ? setCartProducts((prev) => [...prev, params]) : setCartProducts((prev) => [...prev, params]);
-    } else {
-      // Checking the Stock QTY of particular product
-      const productStockQty = cart[index]?.variation?.quantity ? cart[index]?.variation?.quantity : cart[index]?.product?.quantity;
-      if (productStockQty < cart[index]?.quantity + qty) {
-        ToastNotification('error', `You can not add more items than available. In stock ${productStockQty} items.`);
-        return false;
-      }
-
-      if (cart[index]?.variation) {
-        cart[index].variation.selected_variation = cart[index]?.variation?.attribute_values?.map((values) => values.value).join('/');
-      }
-
-      const newQuantity = cart[index].quantity + qty;
-      if (newQuantity < 1) {
-        // Remove the item from the cart if the new quantity is less than 1
-        return removeCart(productObj?.id, cartUid ? cartUid : cart[index].id);
-      } else {
-        cart[index] = {
-          ...cart[index],
-          id: cartUid?.id ? cartUid?.id : cart[index].id ? cart[index].id : null,
-          quantity: newQuantity,
-          sub_total: newQuantity * (cart[index]?.variation ? cart[index]?.variation?.sale_price : cart[index]?.product?.sale_price),
-        };
-        isCookie ? setCartProducts([...cart]) : setCartProducts([...cart]);
-      }
-    }
-    // Update the productQty state immediately after updating the cartProducts state
-    if (isCookie) {
-      setIsProductQty && setIsProductQty(updatedQty);
-      isOpenFun && isOpenFun(true);
-    } else {
-      setIsProductQty && setIsProductQty(updatedQty);
-      isOpenFun && isOpenFun(true);
-    }
-    setCartCanvas(true);
-  };
-
-  // Replace Cart
-  const replaceCart = (updatedQty, productObj, cloneVariation) => {
-    const cart = [...cartProducts];
-    const index = cart.findIndex((item) => item.product_id === productObj?.id);
-    cart[index].quantity = 0;
-
-    const productQty = cart[index]?.variation ? cart[index]?.variation?.quantity : cart[index]?.product?.quantity;
-
-    if (cart[index]?.variation) {
-      cart[index].variation.selected_variation = cart[index]?.variation?.attribute_values?.map((values) => values.value).join('/');  // assigning it to a new property called selected_variation.
-    }
-
-    // Checking the Stock QTY of particular product
-    if (productQty < cart[index]?.quantity + updatedQty) {
-      ToastNotification('error', `You can not add more items than available. In stock ${productQty} items.`);
-      return false;
-    }
-
-    const params = {
-      id: null,
-      product: productObj,
-      product_id: productObj?.id,
-      variation: cloneVariation?.selectedVariation ? cloneVariation?.selectedVariation : null,
-      variation_id: cloneVariation?.selectedVariation?.id ? cloneVariation?.selectedVariation?.id : null,
-      quantity: cloneVariation?.productQty ? cloneVariation?.productQty : updatedQty,
-      sub_total: cloneVariation?.selectedVariation?.sale_price ? updatedQty * cloneVariation?.selectedVariation?.sale_price : updatedQty * productObj?.sale_price,
-    };
-
-    isCookie
-      ? setCartProducts((prevCartProducts) =>
-          prevCartProducts.map((elem) => {
-            if (elem?.product_id === cloneVariation?.selectedVariation?.product_id) {
-              return params;
-            } else {
-              return elem;
-            }
-          }),
-        )
-      : setCartProducts((prevCartProducts) =>
-          prevCartProducts.map((elem) => {
-            if (elem?.product_id === cloneVariation?.selectedVariation?.product_id) {
-              return params;
-            } else {
-              return elem;
-            }
-          }),
-        );
-  };
-
-  // Setting data to localstorage when UAT is not there
-  const storeInLocalStorage = () => {
+  // Calculate cart total
+  const calculateTotal = (items) => {
+    const total = items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0
+    );
     setCartTotal(total);
-    localStorage.setItem('cart', JSON.stringify({ items: cartProducts, total: total }));
+  };
+
+  // Save to localStorage for guest users
+  useEffect(() => {
+    if (!isAuthenticated) {
+      localStorage.setItem("cart", JSON.stringify({ items: cartProducts }));
+      calculateTotal(cartProducts);
+    }
+  }, [cartProducts, isAuthenticated]);
+
+  // Add to cart
+  const handleAddToCart = async (product, variation = null, quantity = 1) => {
+    try {
+      if (isAuthenticated && user) {
+        const cartItem = {
+          product_id: product.id,
+          variation_id: variation?.id || null,
+          quantity: quantity,
+          price: variation?.sale_price || product.sale_price,
+        };
+
+        const updatedCart = await addToCart(user.uid, cartItem);
+        setCartProducts(updatedCart.items || []);
+        calculateTotal(updatedCart.items || []);
+        ToastNotification("success", "Added to cart");
+        setCartCanvas(true);
+      } else {
+        // Guest user - add to localStorage
+        const newItem = {
+          product_id: product.id,
+          product: product,
+          variation_id: variation?.id || null,
+          variation: variation,
+          quantity: quantity,
+          price: variation?.sale_price || product.sale_price,
+        };
+
+        const existingIndex = cartProducts.findIndex(
+          (item) =>
+            item.product_id === newItem.product_id &&
+            item.variation_id === newItem.variation_id
+        );
+
+        if (existingIndex > -1) {
+          const updated = [...cartProducts];
+          updated[existingIndex].quantity += quantity;
+          setCartProducts(updated);
+        } else {
+          setCartProducts([...cartProducts, newItem]);
+        }
+
+        ToastNotification("success", "Added to cart");
+        setCartCanvas(true);
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      ToastNotification("error", "Failed to add to cart");
+    }
+  };
+
+  // Update cart item quantity
+  const handleUpdateQuantity = async (productId, variationId, newQuantity) => {
+    try {
+      if (isAuthenticated && user) {
+        if (newQuantity <= 0) {
+          await handleRemoveFromCart(productId, variationId);
+        } else {
+          const updatedCart = await updateCartItem(
+            user.uid,
+            productId,
+            variationId,
+            newQuantity
+          );
+          setCartProducts(updatedCart.items || []);
+          calculateTotal(updatedCart.items || []);
+        }
+      } else {
+        // Guest user
+        const updated = cartProducts
+          .map((item) => {
+            if (
+              item.product_id === productId &&
+              item.variation_id === variationId
+            ) {
+              return { ...item, quantity: newQuantity };
+            }
+            return item;
+          })
+          .filter((item) => item.quantity > 0);
+
+        setCartProducts(updated);
+      }
+    } catch (error) {
+      console.error("Error updating cart:", error);
+      ToastNotification("error", "Failed to update cart");
+    }
+  };
+
+  // Remove from cart
+  const handleRemoveFromCart = async (productId, variationId = null) => {
+    try {
+      if (isAuthenticated && user) {
+        const updatedCart = await removeFromCart(
+          user.uid,
+          productId,
+          variationId
+        );
+        setCartProducts(updatedCart.items || []);
+        calculateTotal(updatedCart.items || []);
+        ToastNotification("success", "Removed from cart");
+      } else {
+        // Guest user
+        const updated = cartProducts.filter(
+          (item) =>
+            !(
+              item.product_id === productId && item.variation_id === variationId
+            )
+        );
+        setCartProducts(updated);
+        ToastNotification("success", "Removed from cart");
+      }
+    } catch (error) {
+      console.error("Error removing from cart:", error);
+      ToastNotification("error", "Failed to remove from cart");
+    }
+  };
+
+  // Clear entire cart
+  const handleClearCart = async () => {
+    try {
+      if (isAuthenticated && user) {
+        await clearCart(user.uid);
+        setCartProducts([]);
+        setCartTotal(0);
+      } else {
+        setCartProducts([]);
+        setCartTotal(0);
+        localStorage.removeItem("cart");
+      }
+    } catch (error) {
+      console.error("Error clearing cart:", error);
+      ToastNotification("error", "Failed to clear cart");
+    }
+  };
+
+  // Increment/Decrement handler (keeping interface for backward compatibility)
+  const handleIncDec = async (
+    qty,
+    productObj,
+    isProductQty,
+    setIsProductQty,
+    isOpenFun,
+    cloneVariation
+  ) => {
+    const variation = cloneVariation?.selectedVariation || null;
+    const currentItem = cartProducts.find(
+      (item) =>
+        item.product_id === productObj.id && item.variation_id === variation?.id
+    );
+
+    const newQuantity = currentItem ? currentItem.quantity + qty : qty;
+
+    if (newQuantity <= 0) {
+      await handleRemoveFromCart(productObj.id, variation?.id);
+    } else {
+      await handleAddToCart(productObj, variation, qty);
+    }
+
+    if (setIsProductQty) setIsProductQty(newQuantity);
+    if (isOpenFun) isOpenFun(true);
+  };
+
+  // Get total (for backward compatibility)
+  const getTotal = (items) => {
+    return items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   };
 
   return (
@@ -193,13 +242,19 @@ const CartProvider = (props) => {
         setCartProducts,
         cartTotal,
         setCartTotal,
-        removeCart,
+        loading,
+        handleAddToCart,
+        handleUpdateQuantity,
+        handleRemoveFromCart: handleRemoveFromCart,
+        removeCart: handleRemoveFromCart, // Alias for backward compatibility
+        handleClearCart,
         getTotal,
         handleIncDec,
         variationModal,
         setVariationModal,
-        replaceCart,
-      }}>
+        loadCart,
+      }}
+    >
       {props.children}
     </CartContext.Provider>
   );

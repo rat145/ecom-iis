@@ -16,9 +16,10 @@ import {
   serverTimestamp,
   arrayUnion,
   arrayRemove,
-  increment
-} from 'firebase/firestore';
-import { db } from '@/config/firebase.config';
+  increment,
+} from "firebase/firestore";
+import { db } from "@/config/firebase.config";
+import { reviewValidationSchema } from "@/utils/validation/schemas";
 
 // ============ WISHLIST SERVICES ============
 
@@ -29,18 +30,18 @@ import { db } from '@/config/firebase.config';
  */
 export const getWishlist = async (userId) => {
   try {
-    const wishlistDoc = await getDoc(doc(db, 'wishlists', userId));
-    
+    const wishlistDoc = await getDoc(doc(db, "wishlists", userId));
+
     if (!wishlistDoc.exists()) {
       return {
         user_id: userId,
-        product_ids: []
+        product_ids: [],
       };
     }
 
     return wishlistDoc.data();
   } catch (error) {
-    console.error('Error getting wishlist:', error);
+    console.error("Error getting wishlist:", error);
     throw error;
   }
 };
@@ -53,7 +54,7 @@ export const getWishlist = async (userId) => {
  */
 export const addToWishlist = async (userId, productId) => {
   try {
-    const wishlistRef = doc(db, 'wishlists', userId);
+    const wishlistRef = doc(db, "wishlists", userId);
     const wishlistDoc = await getDoc(wishlistRef);
 
     if (!wishlistDoc.exists()) {
@@ -61,19 +62,19 @@ export const addToWishlist = async (userId, productId) => {
       await setDoc(wishlistRef, {
         user_id: userId,
         product_ids: [productId],
-        updated_at: serverTimestamp()
+        updated_at: serverTimestamp(),
       });
     } else {
       // Add to existing wishlist
       await updateDoc(wishlistRef, {
         product_ids: arrayUnion(productId),
-        updated_at: serverTimestamp()
+        updated_at: serverTimestamp(),
       });
     }
 
     return await getWishlist(userId);
   } catch (error) {
-    console.error('Error adding to wishlist:', error);
+    console.error("Error adding to wishlist:", error);
     throw error;
   }
 };
@@ -86,16 +87,16 @@ export const addToWishlist = async (userId, productId) => {
  */
 export const removeFromWishlist = async (userId, productId) => {
   try {
-    const wishlistRef = doc(db, 'wishlists', userId);
-    
+    const wishlistRef = doc(db, "wishlists", userId);
+
     await updateDoc(wishlistRef, {
       product_ids: arrayRemove(productId),
-      updated_at: serverTimestamp()
+      updated_at: serverTimestamp(),
     });
 
     return await getWishlist(userId);
   } catch (error) {
-    console.error('Error removing from wishlist:', error);
+    console.error("Error removing from wishlist:", error);
     throw error;
   }
 };
@@ -111,7 +112,7 @@ export const isInWishlist = async (userId, productId) => {
     const wishlist = await getWishlist(userId);
     return wishlist.product_ids.includes(productId);
   } catch (error) {
-    console.error('Error checking wishlist:', error);
+    console.error("Error checking wishlist:", error);
     return false;
   }
 };
@@ -126,19 +127,19 @@ export const isInWishlist = async (userId, productId) => {
  */
 export const getProductReviews = async (productId, filters = {}) => {
   try {
-    const reviewsRef = collection(db, 'reviews');
-    let q = query(reviewsRef, where('product_id', '==', productId));
+    const reviewsRef = collection(db, "reviews");
+    let q = query(reviewsRef, where("product_id", "==", productId));
 
     // Filter by status
     if (filters.status !== undefined) {
-      q = query(q, where('status', '==', filters.status));
+      q = query(q, where("status", "==", filters.status));
     } else {
       // Default: only approved reviews
-      q = query(q, where('status', '==', 1));
+      q = query(q, where("status", "==", 1));
     }
 
     // Apply sorting
-    q = query(q, orderBy('created_at', 'desc'));
+    q = query(q, orderBy("created_at", "desc"));
 
     const querySnapshot = await getDocs(q);
     const reviews = [];
@@ -149,13 +150,13 @@ export const getProductReviews = async (productId, filters = {}) => {
         id: doc.id,
         ...data,
         created_at: data.created_at?.toDate().toISOString(),
-        updated_at: data.updated_at?.toDate().toISOString()
+        updated_at: data.updated_at?.toDate().toISOString(),
       });
     });
 
     return reviews;
   } catch (error) {
-    console.error('Error getting reviews:', error);
+    console.error("Error getting reviews:", error);
     throw error;
   }
 };
@@ -167,11 +168,11 @@ export const getProductReviews = async (productId, filters = {}) => {
  */
 export const getUserReviews = async (userId) => {
   try {
-    const reviewsRef = collection(db, 'reviews');
+    const reviewsRef = collection(db, "reviews");
     const q = query(
       reviewsRef,
-      where('user_id', '==', userId),
-      orderBy('created_at', 'desc')
+      where("user_id", "==", userId),
+      orderBy("created_at", "desc")
     );
 
     const querySnapshot = await getDocs(q);
@@ -183,13 +184,13 @@ export const getUserReviews = async (userId) => {
         id: doc.id,
         ...data,
         created_at: data.created_at?.toDate().toISOString(),
-        updated_at: data.updated_at?.toDate().toISOString()
+        updated_at: data.updated_at?.toDate().toISOString(),
       });
     });
 
     return reviews;
   } catch (error) {
-    console.error('Error getting user reviews:', error);
+    console.error("Error getting user reviews:", error);
     throw error;
   }
 };
@@ -202,37 +203,39 @@ export const getUserReviews = async (userId) => {
  */
 export const createReview = async (userId, reviewData) => {
   try {
-    const reviewsRef = collection(db, 'reviews');
-    
+    // Validate input
+    await reviewValidationSchema.validate(reviewData);
+    const reviewsRef = collection(db, "reviews");
+
     // Check if user already reviewed this product
     const existingReviewQuery = query(
       reviewsRef,
-      where('user_id', '==', userId),
-      where('product_id', '==', reviewData.product_id)
+      where("user_id", "==", userId),
+      where("product_id", "==", reviewData.product_id)
     );
     const existingReviews = await getDocs(existingReviewQuery);
 
     if (!existingReviews.empty) {
-      throw new Error('You have already reviewed this product');
+      throw new Error("You have already reviewed this product");
     }
 
     const newReview = {
       product_id: reviewData.product_id,
       user_id: userId,
       rating: reviewData.rating,
-      comment: reviewData.comment || '',
+      comment: reviewData.comment || "",
       images: reviewData.images || [],
       status: 0, // Pending approval
       created_at: serverTimestamp(),
-      updated_at: serverTimestamp()
+      updated_at: serverTimestamp(),
     };
 
     const docRef = await addDoc(reviewsRef, newReview);
 
     // Update product review count and rating
-    const productRef = doc(db, 'products', reviewData.product_id);
+    const productRef = doc(db, "products", reviewData.product_id);
     await updateDoc(productRef, {
-      reviews_count: increment(1)
+      reviews_count: increment(1),
     });
 
     // Recalculate average rating
@@ -240,10 +243,13 @@ export const createReview = async (userId, reviewData) => {
 
     return {
       id: docRef.id,
-      ...newReview
+      ...newReview,
     };
   } catch (error) {
-    console.error('Error creating review:', error);
+    if (error.name === "ValidationError") {
+      throw new Error(`Validation failed: ${error.message}`);
+    }
+    console.error("Error creating review:", error);
     throw error;
   }
 };
@@ -257,23 +263,23 @@ export const createReview = async (userId, reviewData) => {
  */
 export const updateReview = async (reviewId, userId, updates) => {
   try {
-    const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewRef = doc(db, "reviews", reviewId);
     const reviewDoc = await getDoc(reviewRef);
 
     if (!reviewDoc.exists()) {
-      throw new Error('Review not found');
+      throw new Error("Review not found");
     }
 
     const reviewData = reviewDoc.data();
 
     // Verify user owns this review
     if (reviewData.user_id !== userId) {
-      throw new Error('Unauthorized to update this review');
+      throw new Error("Unauthorized to update this review");
     }
 
     const updatedData = {
       ...updates,
-      updated_at: serverTimestamp()
+      updated_at: serverTimestamp(),
     };
 
     await updateDoc(reviewRef, updatedData);
@@ -286,10 +292,10 @@ export const updateReview = async (reviewId, userId, updates) => {
     return {
       id: reviewId,
       ...reviewData,
-      ...updatedData
+      ...updatedData,
     };
   } catch (error) {
-    console.error('Error updating review:', error);
+    console.error("Error updating review:", error);
     throw error;
   }
 };
@@ -302,32 +308,32 @@ export const updateReview = async (reviewId, userId, updates) => {
  */
 export const deleteReview = async (reviewId, userId) => {
   try {
-    const reviewRef = doc(db, 'reviews', reviewId);
+    const reviewRef = doc(db, "reviews", reviewId);
     const reviewDoc = await getDoc(reviewRef);
 
     if (!reviewDoc.exists()) {
-      throw new Error('Review not found');
+      throw new Error("Review not found");
     }
 
     const reviewData = reviewDoc.data();
 
     // Verify user owns this review
     if (reviewData.user_id !== userId) {
-      throw new Error('Unauthorized to delete this review');
+      throw new Error("Unauthorized to delete this review");
     }
 
     await deleteDoc(reviewRef);
 
     // Update product review count
-    const productRef = doc(db, 'products', reviewData.product_id);
+    const productRef = doc(db, "products", reviewData.product_id);
     await updateDoc(productRef, {
-      reviews_count: increment(-1)
+      reviews_count: increment(-1),
     });
 
     // Recalculate average rating
     await recalculateProductRating(reviewData.product_id);
   } catch (error) {
-    console.error('Error deleting review:', error);
+    console.error("Error deleting review:", error);
     throw error;
   }
 };
@@ -340,11 +346,11 @@ export const deleteReview = async (reviewId, userId) => {
 const recalculateProductRating = async (productId) => {
   try {
     const reviews = await getProductReviews(productId);
-    
+
     if (reviews.length === 0) {
-      const productRef = doc(db, 'products', productId);
+      const productRef = doc(db, "products", productId);
       await updateDoc(productRef, {
-        rating_count: 0
+        rating_count: 0,
       });
       return;
     }
@@ -352,12 +358,11 @@ const recalculateProductRating = async (productId) => {
     const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
     const averageRating = totalRating / reviews.length;
 
-    const productRef = doc(db, 'products', productId);
+    const productRef = doc(db, "products", productId);
     await updateDoc(productRef, {
-      rating_count: parseFloat(averageRating.toFixed(1))
+      rating_count: parseFloat(averageRating.toFixed(1)),
     });
   } catch (error) {
-    console.error('Error recalculating product rating:', error);
+    console.error("Error recalculating product rating:", error);
   }
 };
-

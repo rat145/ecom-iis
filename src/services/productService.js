@@ -15,9 +15,10 @@ import {
   limit,
   startAfter,
   serverTimestamp,
-  increment
-} from 'firebase/firestore';
-import { db } from '@/config/firebase.config';
+  increment,
+} from "firebase/firestore";
+import { db } from "@/config/firebase.config";
+import { productValidationSchema } from "@/utils/validation/schemas";
 
 /**
  * Get all products with optional filters
@@ -26,44 +27,44 @@ import { db } from '@/config/firebase.config';
  */
 export const getProducts = async (filters = {}) => {
   try {
-    const productsRef = collection(db, 'products');
+    const productsRef = collection(db, "products");
     let q = query(productsRef);
 
     // Apply filters
     if (filters.category) {
-      q = query(q, where('category_ids', 'array-contains', filters.category));
+      q = query(q, where("category_ids", "array-contains", filters.category));
     }
 
     if (filters.store_id) {
-      q = query(q, where('store_id', '==', filters.store_id));
+      q = query(q, where("store_id", "==", filters.store_id));
     }
 
     if (filters.is_featured) {
-      q = query(q, where('is_featured', '==', 1));
+      q = query(q, where("is_featured", "==", 1));
     }
 
     if (filters.is_trending) {
-      q = query(q, where('is_trending', '==', 1));
+      q = query(q, where("is_trending", "==", 1));
     }
 
     if (filters.status !== undefined) {
-      q = query(q, where('status', '==', filters.status));
+      q = query(q, where("status", "==", filters.status));
     } else {
       // Default: only active products
-      q = query(q, where('status', '==', 1));
+      q = query(q, where("status", "==", 1));
     }
 
     // Apply sorting
-    if (filters.sortBy === 'price_asc') {
-      q = query(q, orderBy('sale_price', 'asc'));
-    } else if (filters.sortBy === 'price_desc') {
-      q = query(q, orderBy('sale_price', 'desc'));
-    } else if (filters.sortBy === 'name_asc') {
-      q = query(q, orderBy('name', 'asc'));
-    } else if (filters.sortBy === 'name_desc') {
-      q = query(q, orderBy('name', 'desc'));
+    if (filters.sortBy === "price_asc") {
+      q = query(q, orderBy("sale_price", "asc"));
+    } else if (filters.sortBy === "price_desc") {
+      q = query(q, orderBy("sale_price", "desc"));
+    } else if (filters.sortBy === "name_asc") {
+      q = query(q, orderBy("name", "asc"));
+    } else if (filters.sortBy === "name_desc") {
+      q = query(q, orderBy("name", "desc"));
     } else {
-      q = query(q, orderBy('created_at', 'desc'));
+      q = query(q, orderBy("created_at", "desc"));
     }
 
     // Apply pagination
@@ -81,22 +82,23 @@ export const getProducts = async (filters = {}) => {
     querySnapshot.forEach((doc) => {
       products.push({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       });
     });
 
     // Client-side search filter (if needed)
     if (filters.search) {
       const searchTerm = filters.search.toLowerCase();
-      return products.filter(product =>
-        product.name.toLowerCase().includes(searchTerm) ||
-        product.description?.toLowerCase().includes(searchTerm)
+      return products.filter(
+        (product) =>
+          product.name.toLowerCase().includes(searchTerm) ||
+          product.description?.toLowerCase().includes(searchTerm)
       );
     }
 
     return products;
   } catch (error) {
-    console.error('Error getting products:', error);
+    console.error("Error getting products:", error);
     throw error;
   }
 };
@@ -108,18 +110,18 @@ export const getProducts = async (filters = {}) => {
  */
 export const getProductById = async (productId) => {
   try {
-    const productDoc = await getDoc(doc(db, 'products', productId));
-    
+    const productDoc = await getDoc(doc(db, "products", productId));
+
     if (!productDoc.exists()) {
-      throw new Error('Product not found');
+      throw new Error("Product not found");
     }
 
     return {
       id: productDoc.id,
-      ...productDoc.data()
+      ...productDoc.data(),
     };
   } catch (error) {
-    console.error('Error getting product:', error);
+    console.error("Error getting product:", error);
     throw error;
   }
 };
@@ -131,21 +133,21 @@ export const getProductById = async (productId) => {
  */
 export const getProductBySlug = async (slug) => {
   try {
-    const productsRef = collection(db, 'products');
-    const q = query(productsRef, where('slug', '==', slug), limit(1));
+    const productsRef = collection(db, "products");
+    const q = query(productsRef, where("slug", "==", slug), limit(1));
     const querySnapshot = await getDocs(q);
 
     if (querySnapshot.empty) {
-      throw new Error('Product not found');
+      throw new Error("Product not found");
     }
 
     const productDoc = querySnapshot.docs[0];
     return {
       id: productDoc.id,
-      ...productDoc.data()
+      ...productDoc.data(),
     };
   } catch (error) {
-    console.error('Error getting product by slug:', error);
+    console.error("Error getting product by slug:", error);
     throw error;
   }
 };
@@ -158,8 +160,10 @@ export const getProductBySlug = async (slug) => {
  */
 export const createProduct = async (productData, userId) => {
   try {
-    const productsRef = collection(db, 'products');
-    
+    // Validate input
+    await productValidationSchema.validate(productData);
+    const productsRef = collection(db, "products");
+
     const newProduct = {
       ...productData,
       created_by_id: userId,
@@ -167,17 +171,20 @@ export const createProduct = async (productData, userId) => {
       updated_at: serverTimestamp(),
       orders_count: 0,
       reviews_count: 0,
-      rating_count: 0
+      rating_count: 0,
     };
 
     const docRef = await addDoc(productsRef, newProduct);
 
     return {
       id: docRef.id,
-      ...newProduct
+      ...newProduct,
     };
   } catch (error) {
-    console.error('Error creating product:', error);
+    if (error.name === "ValidationError") {
+      throw new Error(`Validation failed: ${error.message}`);
+    }
+    console.error("Error creating product:", error);
     throw error;
   }
 };
@@ -190,21 +197,21 @@ export const createProduct = async (productData, userId) => {
  */
 export const updateProduct = async (productId, productData) => {
   try {
-    const productRef = doc(db, 'products', productId);
-    
+    const productRef = doc(db, "products", productId);
+
     const updatedData = {
       ...productData,
-      updated_at: serverTimestamp()
+      updated_at: serverTimestamp(),
     };
 
     await updateDoc(productRef, updatedData);
 
     return {
       id: productId,
-      ...updatedData
+      ...updatedData,
     };
   } catch (error) {
-    console.error('Error updating product:', error);
+    console.error("Error updating product:", error);
     throw error;
   }
 };
@@ -216,9 +223,9 @@ export const updateProduct = async (productId, productData) => {
  */
 export const deleteProduct = async (productId) => {
   try {
-    await deleteDoc(doc(db, 'products', productId));
+    await deleteDoc(doc(db, "products", productId));
   } catch (error) {
-    console.error('Error deleting product:', error);
+    console.error("Error deleting product:", error);
     throw error;
   }
 };
@@ -232,11 +239,14 @@ export const deleteProduct = async (productId) => {
 export const getRelatedProducts = async (productId, limitCount = 6) => {
   try {
     const product = await getProductById(productId);
-    
+
     if (product.related_product_ids && product.related_product_ids.length > 0) {
       // Get specific related products
       const relatedProducts = [];
-      for (const relatedId of product.related_product_ids.slice(0, limitCount)) {
+      for (const relatedId of product.related_product_ids.slice(
+        0,
+        limitCount
+      )) {
         try {
           const relatedProduct = await getProductById(relatedId);
           relatedProducts.push(relatedProduct);
@@ -247,30 +257,30 @@ export const getRelatedProducts = async (productId, limitCount = 6) => {
       return relatedProducts;
     } else {
       // Get random products from same category
-      const productsRef = collection(db, 'products');
+      const productsRef = collection(db, "products");
       const q = query(
         productsRef,
-        where('category_ids', 'array-contains-any', product.category_ids || []),
-        where('status', '==', 1),
+        where("category_ids", "array-contains-any", product.category_ids || []),
+        where("status", "==", 1),
         limit(limitCount)
       );
-      
+
       const querySnapshot = await getDocs(q);
       const products = [];
-      
+
       querySnapshot.forEach((doc) => {
         if (doc.id !== productId) {
           products.push({
             id: doc.id,
-            ...doc.data()
+            ...doc.data(),
           });
         }
       });
-      
+
       return products;
     }
   } catch (error) {
-    console.error('Error getting related products:', error);
+    console.error("Error getting related products:", error);
     throw error;
   }
 };
@@ -282,13 +292,12 @@ export const getRelatedProducts = async (productId, limitCount = 6) => {
  */
 export const incrementProductViews = async (productId) => {
   try {
-    const productRef = doc(db, 'products', productId);
+    const productRef = doc(db, "products", productId);
     await updateDoc(productRef, {
-      views_count: increment(1)
+      views_count: increment(1),
     });
   } catch (error) {
-    console.error('Error incrementing product views:', error);
+    console.error("Error incrementing product views:", error);
     // Don't throw error, this is not critical
   }
 };
-
